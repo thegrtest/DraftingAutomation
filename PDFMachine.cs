@@ -105,7 +105,7 @@ namespace SolidWorksToPdf
             {
                 folderBrowser.Description = "Select the directory containing .slddrw and .tif files";
                 folderBrowser.ShowNewFolderButton = false;
-                
+
                 DialogResult result = folderBrowser.ShowDialog();
 
                 if (result == DialogResult.OK && !string.IsNullOrWhiteSpace(folderBrowser.SelectedPath))
