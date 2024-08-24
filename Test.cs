@@ -84,17 +84,28 @@ namespace SolidWorksToPdf
 
             using (PdfDocument document = new PdfDocument())
             {
-                foreach (MagickImage image in new MagickImageCollection(filePath))
+                using (MagickImageCollection images = new MagickImageCollection(filePath))
                 {
-                    PdfPage page = document.AddPage();
-                    page.Width = image.Width * 72 / image.Density.X;
-                    page.Height = image.Height * 72 / image.Density.Y;
-
-                    using (XGraphics gfx = XGraphics.FromPdfPage(page))
+                    foreach (MagickImage image in images)
                     {
-                        using (XImage xImage = XImage.FromGdiPlusImage(image.ToBitmap()))
+                        PdfPage page = document.AddPage();
+                        page.Width = image.Width * 72 / image.Density.X;
+                        page.Height = image.Height * 72 / image.Density.Y;
+
+                        using (MemoryStream memoryStream = new MemoryStream())
                         {
-                            gfx.DrawImage(xImage, 0, 0, page.Width, page.Height);
+                            // Convert MagickImage to a bitmap-compatible format (e.g., PNG)
+                            image.Format = MagickFormat.Png;
+                            image.Write(memoryStream);
+                            memoryStream.Position = 0;
+
+                            using (XImage xImage = XImage.FromStream(memoryStream))
+                            {
+                                using (XGraphics gfx = XGraphics.FromPdfPage(page))
+                                {
+                                    gfx.DrawImage(xImage, 0, 0, page.Width, page.Height);
+                                }
+                            }
                         }
                     }
                 }
