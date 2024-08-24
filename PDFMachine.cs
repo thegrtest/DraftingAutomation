@@ -1,5 +1,5 @@
 using System;
-using System.Drawing;  // For handling image processing
+using System.Drawing;
 using System.IO;
 using System.Windows.Forms;
 using PdfSharp.Pdf;
@@ -38,6 +38,8 @@ namespace SolidWorksToPdf
             }
 
             swApp.ExitApp();
+            swApp = null;
+            GC.Collect();
         }
 
         static void ConvertSlddrwToPdf(SldWorks swApp, string filePath)
