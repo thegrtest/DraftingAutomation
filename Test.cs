@@ -9,7 +9,6 @@ using SolidWorks.Interop.swconst;
 using ImageMagick;
 using PdfPigDocument = UglyToad.PdfPig.PdfDocument;  // Alias PdfPig's PdfDocument
 using PdfPigPage = UglyToad.PdfPig.Content.Page;    // Alias PdfPig's Page
-using UglyToad.PdfPig.Geometry;  // For PdfRectangle
 
 namespace SolidWorksToPdf
 {
@@ -93,7 +92,7 @@ namespace SolidWorksToPdf
         {
             string pdfFilePath = Path.ChangeExtension(filePath, ".pdf");
 
-            using (PdfSharpDocument document = new PdfSharpDocument())
+            using (PdfDocument document = new PdfDocument())  // Direct reference to PdfSharp's PdfDocument
             {
                 using (MagickImageCollection images = new MagickImageCollection(filePath))
                 {
@@ -136,19 +135,17 @@ namespace SolidWorksToPdf
                     var height = page.Height;
 
                     // Define the region to extract text from (bottom-right corner)
-                    var bottomRightRegion = new PdfRectangle(
-                        width - 150,
-                        0,
-                        width,
-                        150
-                    );
+                    double regionLeft = width - 150;
+                    double regionBottom = 0;
+                    double regionRight = width;
+                    double regionTop = 150;
 
                     // Extract text from the defined region
                     var words = page.GetWords().Where(w =>
-                        w.BoundingBox.BottomLeft.X >= bottomRightRegion.Left &&
-                        w.BoundingBox.BottomLeft.Y >= bottomRightRegion.Bottom &&
-                        w.BoundingBox.TopRight.X <= bottomRightRegion.Right &&
-                        w.BoundingBox.TopRight.Y <= bottomRightRegion.Top
+                        w.BoundingBox.BottomLeft.X >= regionLeft &&
+                        w.BoundingBox.BottomLeft.Y >= regionBottom &&
+                        w.BoundingBox.TopRight.X <= regionRight &&
+                        w.BoundingBox.TopRight.Y <= regionTop
                     ).ToList();
 
                     Console.WriteLine($"Extracted text from {pdfFilePath}:");
