@@ -23,7 +23,8 @@ namespace SolidWorksToPdf
             }
 
             SldWorks swApp = new SldWorks();
-            swApp.Visible = true;
+            swApp.Visible = false;  // Make SolidWorks invisible
+            swApp.FrameState = (int)swWindowState_e.swWindowMinimized;  // Minimize the SolidWorks window
 
             // Convert all .slddrw files in the directory to PDFs
             foreach (string filePath in Directory.GetFiles(directoryPath, "*.slddrw"))
