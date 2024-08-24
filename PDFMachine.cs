@@ -59,8 +59,8 @@ namespace SolidWorksToPdf
                                                              ref errors,
                                                              ref warnings);
 
-                // Close the drawing document without saving changes
-                drawingDoc.Close(false);
+                // Properly close the document using CloseDoc
+                swApp.CloseDoc(drawingDoc.GetTitle());
 
                 if (saveResult && errors == 0)
                 {
