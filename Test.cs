@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Linq;
 using System.Windows.Forms;
 using PdfSharp.Pdf;
 using PdfSharp.Drawing;
@@ -8,6 +9,7 @@ using SolidWorks.Interop.swconst;
 using ImageMagick;
 using UglyToad.PdfPig;
 using UglyToad.PdfPig.Content;
+using UglyToad.PdfPig.Geometry;
 
 namespace SolidWorksToPdf
 {
@@ -127,18 +129,19 @@ namespace SolidWorksToPdf
 
         static void ExtractTextFromPdfBottomRight(string pdfFilePath)
         {
-            using (PdfDocument pdfDocument = PdfDocument.Open(pdfFilePath))
+            using (var pdfDocument = PdfDocument.Open(pdfFilePath))
             {
-                foreach (Page page in pdfDocument.GetPages())
+                foreach (var page in pdfDocument.GetPages())
                 {
                     var width = page.Width;
                     var height = page.Height;
 
                     // Define the region to extract text from (bottom-right corner)
-                    var bottomRightRegion = new PdfRectangle(width - 200, 0, width, 200);
+                    // Adjusting the rectangle to capture text in the bottom right
+                    var bottomRightRegion = new PdfRectangle(width - 150, 0, width, 150);
 
                     // Extract text from the defined region
-                    var words = page.GetWordsInRectangle(bottomRightRegion);
+                    var words = page.GetWords().Where(w => bottomRightRegion.Contains(w.BoundingBox.BottomLeft)).ToList();
 
                     Console.WriteLine($"Extracted text from {pdfFilePath}:");
                     foreach (var word in words)
