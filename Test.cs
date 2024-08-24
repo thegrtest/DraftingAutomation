@@ -10,7 +10,7 @@ using ImageMagick;
 using PdfPigDocument = UglyToad.PdfPig.PdfDocument;  // Alias PdfPig's PdfDocument
 using PdfPigPage = UglyToad.PdfPig.Content.Page;    // Alias PdfPig's Page
 using PdfSharpDocument = PdfSharp.Pdf.PdfDocument;  // Alias PdfSharp's PdfDocument
-using UglyToad.PdfPig.Geometry;  // Correct namespace for PdfRectangle
+using UglyToad.PdfPig.Geometry;  // Correct namespace for PdfRectangle and PdfPoint
 
 namespace SolidWorksToPdf
 {
