@@ -7,9 +7,9 @@ using PdfSharp.Drawing;
 using SolidWorks.Interop.sldworks;
 using SolidWorks.Interop.swconst;
 using ImageMagick;
-using UglyToad.PdfPig;
-using UglyToad.PdfPig.Content;
-using UglyToad.PdfPig.Geometry;
+using PdfPigDocument = UglyToad.PdfPig.PdfDocument;  // Alias PdfPig's PdfDocument
+using PdfPigPage = UglyToad.PdfPig.Content.Page;    // Alias PdfPig's Page
+using PdfSharpDocument = PdfSharp.Pdf.PdfDocument;  // Alias PdfSharp's PdfDocument
 
 namespace SolidWorksToPdf
 {
@@ -93,7 +93,7 @@ namespace SolidWorksToPdf
         {
             string pdfFilePath = Path.ChangeExtension(filePath, ".pdf");
 
-            using (PdfDocument document = new PdfDocument())
+            using (PdfSharpDocument document = new PdfSharpDocument())
             {
                 using (MagickImageCollection images = new MagickImageCollection(filePath))
                 {
@@ -129,16 +129,16 @@ namespace SolidWorksToPdf
 
         static void ExtractTextFromPdfBottomRight(string pdfFilePath)
         {
-            using (var pdfDocument = PdfDocument.Open(pdfFilePath))
+            using (PdfPigDocument pdfDocument = PdfPigDocument.Open(pdfFilePath))
             {
-                foreach (var page in pdfDocument.GetPages())
+                foreach (PdfPigPage page in pdfDocument.GetPages())
                 {
                     var width = page.Width;
                     var height = page.Height;
 
                     // Define the region to extract text from (bottom-right corner)
                     // Adjusting the rectangle to capture text in the bottom right
-                    var bottomRightRegion = new PdfRectangle(width - 150, 0, width, 150);
+                    var bottomRightRegion = new UglyToad.PdfPig.Geometry.PdfRectangle(width - 150, 0, width, 150);
 
                     // Extract text from the defined region
                     var words = page.GetWords().Where(w => bottomRightRegion.Contains(w.BoundingBox.BottomLeft)).ToList();
