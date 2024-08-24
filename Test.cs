@@ -9,8 +9,7 @@ using SolidWorks.Interop.swconst;
 using ImageMagick;
 using PdfPigDocument = UglyToad.PdfPig.PdfDocument;  // Alias PdfPig's PdfDocument
 using PdfPigPage = UglyToad.PdfPig.Content.Page;    // Alias PdfPig's Page
-using PdfSharpDocument = PdfSharp.Pdf.PdfDocument;  // Alias PdfSharp's PdfDocument
-using UglyToad.PdfPig.Geometry;  // Correct namespace for PdfRectangle
+using UglyToad.PdfPig.Geometry;  // For PdfRectangle
 
 namespace SolidWorksToPdf
 {
@@ -104,16 +103,15 @@ namespace SolidWorksToPdf
                         page.Width = image.Width * 72 / image.Density.X;
                         page.Height = image.Height * 72 / image.Density.Y;
 
-                        using (MemoryStream memoryStream = new MemoryStream())
+                        using (XGraphics gfx = XGraphics.FromPdfPage(page))
                         {
-                            // Convert MagickImage to a bitmap-compatible format (e.g., PNG)
-                            image.Format = MagickFormat.Png;
-                            image.Write(memoryStream);
-                            memoryStream.Position = 0;
-
-                            using (XImage xImage = XImage.FromStream(memoryStream))
+                            using (MemoryStream memoryStream = new MemoryStream())
                             {
-                                using (XGraphics gfx = XGraphics.FromPdfPage(page))
+                                image.Format = MagickFormat.Png;
+                                image.Write(memoryStream);
+                                memoryStream.Position = 0;
+
+                                using (XImage xImage = XImage.FromStream(memoryStream))
                                 {
                                     gfx.DrawImage(xImage, 0, 0, page.Width, page.Height);
                                 }
@@ -138,12 +136,20 @@ namespace SolidWorksToPdf
                     var height = page.Height;
 
                     // Define the region to extract text from (bottom-right corner)
-                    var bottomLeft = new PdfPoint(width - 150, 0);
-                    var topRight = new PdfPoint(width, 150);
-                    var bottomRightRegion = new PdfRectangle(bottomLeft, topRight);
+                    var bottomRightRegion = new PdfRectangle(
+                        width - 150,
+                        0,
+                        width,
+                        150
+                    );
 
                     // Extract text from the defined region
-                    var words = page.GetWords().Where(w => bottomRightRegion.Contains(w.BoundingBox.BottomLeft)).ToList();
+                    var words = page.GetWords().Where(w =>
+                        w.BoundingBox.BottomLeft.X >= bottomRightRegion.Left &&
+                        w.BoundingBox.BottomLeft.Y >= bottomRightRegion.Bottom &&
+                        w.BoundingBox.TopRight.X <= bottomRightRegion.Right &&
+                        w.BoundingBox.TopRight.Y <= bottomRightRegion.Top
+                    ).ToList();
 
                     Console.WriteLine($"Extracted text from {pdfFilePath}:");
                     foreach (var word in words)
@@ -154,7 +160,6 @@ namespace SolidWorksToPdf
             }
         }
 
-        // Method to open a FolderBrowserDialog and return the selected directory path
         static string SelectDirectory()
         {
             using (FolderBrowserDialog folderBrowser = new FolderBrowserDialog())
