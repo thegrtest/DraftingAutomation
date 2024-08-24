@@ -5,7 +5,9 @@ using PdfSharp.Pdf;
 using PdfSharp.Drawing;
 using SolidWorks.Interop.sldworks;
 using SolidWorks.Interop.swconst;
-using ImageMagick;  // Import Magick.NET
+using ImageMagick;
+using UglyToad.PdfPig;
+using UglyToad.PdfPig.Content;
 
 namespace SolidWorksToPdf
 {
@@ -40,6 +42,13 @@ namespace SolidWorksToPdf
 
             swApp.ExitApp();
             swApp = null;
+
+            // After generating all PDFs, extract text from the bottom right corner
+            foreach (string pdfFilePath in Directory.GetFiles(directoryPath, "*.pdf"))
+            {
+                ExtractTextFromPdfBottomRight(pdfFilePath);
+            }
+
             GC.Collect();
         }
 
@@ -114,6 +123,30 @@ namespace SolidWorksToPdf
             }
 
             Console.WriteLine($"Successfully converted {filePath} to PDF.");
+        }
+
+        static void ExtractTextFromPdfBottomRight(string pdfFilePath)
+        {
+            using (PdfDocument pdfDocument = PdfDocument.Open(pdfFilePath))
+            {
+                foreach (Page page in pdfDocument.GetPages())
+                {
+                    var width = page.Width;
+                    var height = page.Height;
+
+                    // Define the region to extract text from (bottom-right corner)
+                    var bottomRightRegion = new PdfRectangle(width - 200, 0, width, 200);
+
+                    // Extract text from the defined region
+                    var words = page.GetWordsInRectangle(bottomRightRegion);
+
+                    Console.WriteLine($"Extracted text from {pdfFilePath}:");
+                    foreach (var word in words)
+                    {
+                        Console.WriteLine(word.Text);
+                    }
+                }
+            }
         }
 
         // Method to open a FolderBrowserDialog and return the selected directory path
