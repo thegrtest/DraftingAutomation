@@ -10,6 +10,7 @@ using ImageMagick;
 using PdfPigDocument = UglyToad.PdfPig.PdfDocument;  // Alias PdfPig's PdfDocument
 using PdfPigPage = UglyToad.PdfPig.Content.Page;    // Alias PdfPig's Page
 using PdfSharpDocument = PdfSharp.Pdf.PdfDocument;  // Alias PdfSharp's PdfDocument
+using UglyToad.PdfPig.Geometry;  // Correct namespace for PdfRectangle
 
 namespace SolidWorksToPdf
 {
@@ -138,7 +139,7 @@ namespace SolidWorksToPdf
 
                     // Define the region to extract text from (bottom-right corner)
                     // Adjusting the rectangle to capture text in the bottom right
-                    var bottomRightRegion = new UglyToad.PdfPig.Geometry.PdfRectangle(width - 150, 0, width, 150);
+                    var bottomRightRegion = new PdfRectangle(width - 150, 0, width, 150);
 
                     // Extract text from the defined region
                     var words = page.GetWords().Where(w => bottomRightRegion.Contains(w.BoundingBox.BottomLeft)).ToList();
