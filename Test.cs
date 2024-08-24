@@ -7,11 +7,12 @@ using PdfSharp.Drawing;
 using SolidWorks.Interop.sldworks;
 using SolidWorks.Interop.swconst;
 using ImageMagick;
-using UglyToad.PdfPig;
-using UglyToad.PdfPig.Content;
-using UglyToad.PdfPig.Geometry;
+using PdfPigDocument = UglyToad.PdfPig.PdfDocument;  // Alias PdfPig's PdfDocument
+using PdfPigPage = UglyToad.PdfPig.Content.Page;    // Alias PdfPig's Page
+using PdfSharpDocument = PdfSharp.Pdf.PdfDocument;  // Alias PdfSharp's PdfDocument
+using UglyToad.PdfPig.Geometry;  // Correct namespace for PdfRectangle
 
-namespace CombinedProcessor
+namespace SolidWorksToPdf
 {
     class Program
     {
@@ -26,46 +27,32 @@ namespace CombinedProcessor
                 return;
             }
 
-            // Convert .slddrw files to PDFs
             SldWorks swApp = new SldWorks();
-            swApp.Visible = false;  // Run SolidWorks in the background
+            swApp.Visible = false;  // Make SolidWorks invisible
+            swApp.FrameState = (int)swWindowState_e.swWindowMinimized;  // Minimize the SolidWorks window
 
+            // Convert all .slddrw files in the directory to PDFs
             foreach (string filePath in Directory.GetFiles(directoryPath, "*.slddrw"))
             {
                 ConvertSlddrwToPdf(swApp, filePath);
             }
 
-            // Convert .tif files to PDFs
+            // Convert all .tif files in the directory to PDFs
             foreach (string filePath in Directory.GetFiles(directoryPath, "*.tif"))
             {
                 ConvertTifToPdf(filePath);
             }
 
-            // Close SolidWorks
             swApp.ExitApp();
             swApp = null;
 
-            // Extract text from bottom-right corner of PDFs
+            // After generating all PDFs, extract text from the bottom right corner
             foreach (string pdfFilePath in Directory.GetFiles(directoryPath, "*.pdf"))
             {
                 ExtractTextFromPdfBottomRight(pdfFilePath);
             }
-        }
 
-        static string SelectDirectory()
-        {
-            using (FolderBrowserDialog folderBrowser = new FolderBrowserDialog())
-            {
-                folderBrowser.Description = "Select the directory containing .slddrw and .tif files";
-                folderBrowser.ShowNewFolderButton = false;
-
-                DialogResult result = folderBrowser.ShowDialog();
-                if (result == DialogResult.OK && !string.IsNullOrWhiteSpace(folderBrowser.SelectedPath))
-                {
-                    return folderBrowser.SelectedPath;
-                }
-                return null;
-            }
+            GC.Collect();
         }
 
         static void ConvertSlddrwToPdf(SldWorks swApp, string filePath)
@@ -75,12 +62,31 @@ namespace CombinedProcessor
             if (drawingDoc != null)
             {
                 string pdfFilePath = Path.ChangeExtension(filePath, ".pdf");
-                drawingDoc.Extension.SaveAs(pdfFilePath,
-                                            (int)swSaveAsVersion_e.swSaveAsCurrentVersion,
-                                            (int)swSaveAsOptions_e.swSaveAsOptions_Silent,
-                                            null, out int errors, out int warnings);
+                int errors = 0;
+                int warnings = 0;
+
+                bool saveResult = drawingDoc.Extension.SaveAs(pdfFilePath,
+                                                             (int)swSaveAsVersion_e.swSaveAsCurrentVersion,
+                                                             (int)swSaveAsOptions_e.swSaveAsOptions_Silent,
+                                                             null,
+                                                             ref errors,
+                                                             ref warnings);
+
+                // Properly close the document using CloseDoc
                 swApp.CloseDoc(drawingDoc.GetTitle());
-                Console.WriteLine($"Converted {filePath} to {pdfFilePath}");
+
+                if (saveResult && errors == 0)
+                {
+                    Console.WriteLine($"Successfully converted {filePath} to PDF.");
+                }
+                else
+                {
+                    Console.WriteLine($"Failed to convert {filePath} to PDF. Errors: {errors}, Warnings: {warnings}");
+                }
+            }
+            else
+            {
+                Console.WriteLine($"Failed to open {filePath}. Ensure SolidWorks is installed and the file is accessible.");
             }
         }
 
@@ -88,7 +94,7 @@ namespace CombinedProcessor
         {
             string pdfFilePath = Path.ChangeExtension(filePath, ".pdf");
 
-            using (PdfDocument document = new PdfDocument())
+            using (PdfSharpDocument document = new PdfSharpDocument())
             {
                 using (MagickImageCollection images = new MagickImageCollection(filePath))
                 {
@@ -98,15 +104,16 @@ namespace CombinedProcessor
                         page.Width = image.Width * 72 / image.Density.X;
                         page.Height = image.Height * 72 / image.Density.Y;
 
-                        using (XGraphics gfx = XGraphics.FromPdfPage(page))
+                        using (MemoryStream memoryStream = new MemoryStream())
                         {
-                            using (MemoryStream memoryStream = new MemoryStream())
-                            {
-                                image.Format = MagickFormat.Png;
-                                image.Write(memoryStream);
-                                memoryStream.Position = 0;
+                            // Convert MagickImage to a bitmap-compatible format (e.g., PNG)
+                            image.Format = MagickFormat.Png;
+                            image.Write(memoryStream);
+                            memoryStream.Position = 0;
 
-                                using (XImage xImage = XImage.FromStream(memoryStream))
+                            using (XImage xImage = XImage.FromStream(memoryStream))
+                            {
+                                using (XGraphics gfx = XGraphics.FromPdfPage(page))
                                 {
                                     gfx.DrawImage(xImage, 0, 0, page.Width, page.Height);
                                 }
@@ -114,42 +121,54 @@ namespace CombinedProcessor
                         }
                     }
                 }
+
                 document.Save(pdfFilePath);
-                Console.WriteLine($"Converted {filePath} to {pdfFilePath}");
             }
+
+            Console.WriteLine($"Successfully converted {filePath} to PDF.");
         }
 
         static void ExtractTextFromPdfBottomRight(string pdfFilePath)
         {
-            using (PdfDocument pdfDocument = PdfDocument.Open(pdfFilePath))
+            using (PdfPigDocument pdfDocument = PdfPigDocument.Open(pdfFilePath))
             {
-                foreach (Page page in pdfDocument.GetPages())
+                foreach (PdfPigPage page in pdfDocument.GetPages())
                 {
                     var width = page.Width;
                     var height = page.Height;
 
                     // Define the region to extract text from (bottom-right corner)
-                    var bottomRightRegion = new PdfRectangle(
-                        width - 150,
-                        0,
-                        width,
-                        150
-                    );
+                    var bottomLeft = new PdfPoint(width - 150, 0);
+                    var topRight = new PdfPoint(width, 150);
+                    var bottomRightRegion = new PdfRectangle(bottomLeft, topRight);
 
                     // Extract text from the defined region
-                    var words = page.GetWords().Where(w =>
-                        w.BoundingBox.BottomLeft.X >= bottomRightRegion.Left &&
-                        w.BoundingBox.BottomLeft.Y >= bottomRightRegion.Bottom &&
-                        w.BoundingBox.TopRight.X <= bottomRightRegion.Right &&
-                        w.BoundingBox.TopRight.Y <= bottomRightRegion.Top
-                    );
+                    var words = page.GetWords().Where(w => bottomRightRegion.Contains(w.BoundingBox.BottomLeft)).ToList();
 
-                    Console.WriteLine($"Text extracted from {pdfFilePath}:");
+                    Console.WriteLine($"Extracted text from {pdfFilePath}:");
                     foreach (var word in words)
                     {
                         Console.WriteLine(word.Text);
                     }
                 }
+            }
+        }
+
+        // Method to open a FolderBrowserDialog and return the selected directory path
+        static string SelectDirectory()
+        {
+            using (FolderBrowserDialog folderBrowser = new FolderBrowserDialog())
+            {
+                folderBrowser.Description = "Select the directory containing .slddrw and .tif files";
+                folderBrowser.ShowNewFolderButton = false;
+
+                DialogResult result = folderBrowser.ShowDialog();
+
+                if (result == DialogResult.OK && !string.IsNullOrWhiteSpace(folderBrowser.SelectedPath))
+                {
+                    return folderBrowser.SelectedPath;
+                }
+                return null;
             }
         }
     }
