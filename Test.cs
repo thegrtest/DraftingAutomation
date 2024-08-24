@@ -1,11 +1,11 @@
 using System;
-using System.Drawing;
 using System.IO;
 using System.Windows.Forms;
 using PdfSharp.Pdf;
 using PdfSharp.Drawing;
 using SolidWorks.Interop.sldworks;
 using SolidWorks.Interop.swconst;
+using ImageMagick;  // Import Magick.NET
 
 namespace SolidWorksToPdf
 {
@@ -84,16 +84,21 @@ namespace SolidWorksToPdf
 
             using (PdfDocument document = new PdfDocument())
             {
-                PdfPage page = document.AddPage();
-                using (XGraphics gfx = XGraphics.FromPdfPage(page))
+                foreach (MagickImage image in new MagickImageCollection(filePath))
                 {
-                    using (XImage image = XImage.FromFile(filePath))
+                    PdfPage page = document.AddPage();
+                    page.Width = image.Width * 72 / image.Density.X;
+                    page.Height = image.Height * 72 / image.Density.Y;
+
+                    using (XGraphics gfx = XGraphics.FromPdfPage(page))
                     {
-                        page.Width = image.PixelWidth * 72 / image.HorizontalResolution;
-                        page.Height = image.PixelHeight * 72 / image.VerticalResolution;
-                        gfx.DrawImage(image, 0, 0, page.Width, page.Height);
+                        using (XImage xImage = XImage.FromGdiPlusImage(image.ToBitmap()))
+                        {
+                            gfx.DrawImage(xImage, 0, 0, page.Width, page.Height);
+                        }
                     }
                 }
+
                 document.Save(pdfFilePath);
             }
 
