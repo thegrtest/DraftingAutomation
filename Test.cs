@@ -138,8 +138,9 @@ namespace SolidWorksToPdf
                     var height = page.Height;
 
                     // Define the region to extract text from (bottom-right corner)
-                    // Adjusting the rectangle to capture text in the bottom right
-                    var bottomRightRegion = new PdfRectangle(width - 150, 0, width, 150);
+                    var bottomLeft = new PdfPoint(width - 150, 0);
+                    var topRight = new PdfPoint(width, 150);
+                    var bottomRightRegion = new PdfRectangle(bottomLeft, topRight);
 
                     // Extract text from the defined region
                     var words = page.GetWords().Where(w => bottomRightRegion.Contains(w.BoundingBox.BottomLeft)).ToList();
