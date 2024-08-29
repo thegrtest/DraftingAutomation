@@ -7,8 +7,6 @@ using PdfSharp.Drawing;
 using SolidWorks.Interop.sldworks;
 using SolidWorks.Interop.swconst;
 using ImageMagick;
-using PdfPigDocument = UglyToad.PdfPig.PdfDocument;  // Alias PdfPig's PdfDocument
-using PdfPigPage = UglyToad.PdfPig.Content.Page;    // Alias PdfPig's Page
 
 namespace SolidWorksToPdf
 {
@@ -41,14 +39,14 @@ namespace SolidWorksToPdf
                 ConvertTifToPdf(filePath);
             }
 
+            // Convert all .dwg files in the directory to PDFs
+            foreach (string filePath in Directory.GetFiles(directoryPath, "*.dwg"))
+            {
+                ConvertDwgToPdf(swApp, filePath);
+            }
+
             swApp.ExitApp();
             swApp = null;
-
-            // After generating all PDFs, extract text from the bottom right corner
-            foreach (string pdfFilePath in Directory.GetFiles(directoryPath, "*.pdf"))
-            {
-                ExtractTextFromPdfBottomRight(pdfFilePath);
-            }
 
             GC.Collect();
         }
@@ -125,35 +123,38 @@ namespace SolidWorksToPdf
             Console.WriteLine($"Successfully converted {filePath} to PDF.");
         }
 
-        static void ExtractTextFromPdfBottomRight(string pdfFilePath)
+        static void ConvertDwgToPdf(SldWorks swApp, string filePath)
         {
-            using (PdfPigDocument pdfDocument = PdfPigDocument.Open(pdfFilePath))
+            ModelDoc2 dwgDoc = (ModelDoc2)swApp.OpenDoc(filePath, (int)swDocumentTypes_e.swDocDRAWING);
+
+            if (dwgDoc != null)
             {
-                foreach (PdfPigPage page in pdfDocument.GetPages())
+                string pdfFilePath = Path.ChangeExtension(filePath, ".pdf");
+                int errors = 0;
+                int warnings = 0;
+
+                bool saveResult = dwgDoc.Extension.SaveAs(pdfFilePath,
+                                                          (int)swSaveAsVersion_e.swSaveAsCurrentVersion,
+                                                          (int)swSaveAsOptions_e.swSaveAsOptions_Silent,
+                                                          null,
+                                                          ref errors,
+                                                          ref warnings);
+
+                // Properly close the document using CloseDoc
+                swApp.CloseDoc(dwgDoc.GetTitle());
+
+                if (saveResult && errors == 0)
                 {
-                    var width = page.Width;
-                    var height = page.Height;
-
-                    // Define the region to extract text from (bottom-right corner)
-                    double regionLeft = width - 150;
-                    double regionBottom = 0;
-                    double regionRight = width;
-                    double regionTop = 150;
-
-                    // Extract text from the defined region
-                    var words = page.GetWords().Where(w =>
-                        w.BoundingBox.BottomLeft.X >= regionLeft &&
-                        w.BoundingBox.BottomLeft.Y >= regionBottom &&
-                        w.BoundingBox.TopRight.X <= regionRight &&
-                        w.BoundingBox.TopRight.Y <= regionTop
-                    ).ToList();
-
-                    Console.WriteLine($"Extracted text from {pdfFilePath}:");
-                    foreach (var word in words)
-                    {
-                        Console.WriteLine(word.Text);
-                    }
+                    Console.WriteLine($"Successfully converted {filePath} to PDF.");
                 }
+                else
+                {
+                    Console.WriteLine($"Failed to convert {filePath} to PDF. Errors: {errors}, Warnings: {warnings}");
+                }
+            }
+            else
+            {
+                Console.WriteLine($"Failed to open {filePath}. Ensure SolidWorks is installed and the file is accessible.");
             }
         }
 
@@ -161,7 +162,7 @@ namespace SolidWorksToPdf
         {
             using (FolderBrowserDialog folderBrowser = new FolderBrowserDialog())
             {
-                folderBrowser.Description = "Select the directory containing .slddrw and .tif files";
+                folderBrowser.Description = "Select the directory containing .slddrw, .tif, and .dwg files";
                 folderBrowser.ShowNewFolderButton = false;
 
                 DialogResult result = folderBrowser.ShowDialog();
