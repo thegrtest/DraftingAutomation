@@ -7,6 +7,8 @@ using PdfSharp.Drawing;
 using SolidWorks.Interop.sldworks;
 using SolidWorks.Interop.swconst;
 using ImageMagick;
+using SwConst;
+using swDocumentTypes_e = SolidWorks.Interop.swconst.swDocumentTypes_e;
 
 namespace SolidWorksToPdf
 {
@@ -25,7 +27,7 @@ namespace SolidWorksToPdf
 
             SldWorks swApp = new SldWorks();
             swApp.Visible = false;  // Make SolidWorks invisible
-            swApp.FrameState = (int)swWindowState_e.swWindowMinimized;  // Minimize the SolidWorks window
+            swApp.FrameState = (int)SolidWorks.Interop.swconst.swWindowState_e.swWindowMinimized;  // Minimize the SolidWorks window
 
             // Convert all .slddrw files in the directory to PDFs
             foreach (string filePath in Directory.GetFiles(directoryPath, "*.slddrw"))
@@ -62,8 +64,8 @@ namespace SolidWorksToPdf
                 int warnings = 0;
 
                 bool saveResult = drawingDoc.Extension.SaveAs(pdfFilePath,
-                                                             (int)swSaveAsVersion_e.swSaveAsCurrentVersion,
-                                                             (int)swSaveAsOptions_e.swSaveAsOptions_Silent,
+                                                             (int)SolidWorks.Interop.swconst.swSaveAsVersion_e.swSaveAsCurrentVersion,
+                                                             (int)SolidWorks.Interop.swconst.swSaveAsOptions_e.swSaveAsOptions_Silent,
                                                              null,
                                                              ref errors,
                                                              ref warnings);
@@ -134,8 +136,8 @@ namespace SolidWorksToPdf
                 int warnings = 0;
 
                 bool saveResult = dwgDoc.Extension.SaveAs(pdfFilePath,
-                                                          (int)swSaveAsVersion_e.swSaveAsCurrentVersion,
-                                                          (int)swSaveAsOptions_e.swSaveAsOptions_Silent,
+                                                          (int)SolidWorks.Interop.swconst.swSaveAsVersion_e.swSaveAsCurrentVersion,
+                                                          (int)SolidWorks.Interop.swconst.swSaveAsOptions_e.swSaveAsOptions_Silent,
                                                           null,
                                                           ref errors,
                                                           ref warnings);
