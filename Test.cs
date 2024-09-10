@@ -1,16 +1,12 @@
 using System;
 using System.IO;
-using System.Linq;
+using System.Reflection;
 using System.Windows.Forms;
 using PdfSharp.Pdf;
 using PdfSharp.Drawing;
 using SolidWorks.Interop.sldworks;
 using SolidWorks.Interop.swconst;
 using ImageMagick;
-using Autodesk.AutoCAD.Interop;   // Add AutoCAD Interop for DWG handling
-using Autodesk.AutoCAD.Interop.Common;
-using SwConst;
-using swDocumentTypes_e = SolidWorks.Interop.swconst.swDocumentTypes_e;
 
 namespace SolidWorksToPdf
 {
@@ -35,26 +31,27 @@ namespace SolidWorksToPdf
                 return;
             }
 
+            // SolidWorks conversion for .slddrw files
             SldWorks swApp = new SldWorks();
-            swApp.Visible = false;  // Make SolidWorks invisible
-            swApp.FrameState = (int)SolidWorks.Interop.swconst.swWindowState_e.swWindowMinimized;  // Minimize the SolidWorks window
+            swApp.Visible = false;
+            swApp.FrameState = (int)SolidWorks.Interop.swconst.swWindowState_e.swWindowMinimized;
 
-            // Convert all .slddrw files in the directory to PDFs
+            // Convert .slddrw files to PDFs
             foreach (string filePath in Directory.GetFiles(inputDirectoryPath, "*.slddrw"))
             {
                 ConvertSlddrwToPdf(swApp, filePath, outputDirectoryPath);
             }
 
-            // Convert all .tif files in the directory to PDFs
+            // Convert .tif files to PDFs
             foreach (string filePath in Directory.GetFiles(inputDirectoryPath, "*.tif"))
             {
                 ConvertTifToPdf(filePath, outputDirectoryPath);
             }
 
-            // Convert all .dwg files in the directory to PDFs using AutoCAD COM
+            // Convert .dwg files to PDFs using AutoCAD COM via late binding
             foreach (string filePath in Directory.GetFiles(inputDirectoryPath, "*.dwg"))
             {
-                ConvertDwgToPdf(filePath, outputDirectoryPath);
+                ConvertDwgToPdfLateBinding(filePath, outputDirectoryPath);
             }
 
             swApp.ExitApp();
@@ -65,7 +62,7 @@ namespace SolidWorksToPdf
 
         static void ConvertSlddrwToPdf(SldWorks swApp, string filePath, string outputDirectory)
         {
-            ModelDoc2 drawingDoc = (ModelDoc2)swApp.OpenDoc(filePath, (int)swDocumentTypes_e.swDocDRAWING);
+            ModelDoc2 drawingDoc = (ModelDoc2)swApp.OpenDoc(filePath, (int)SolidWorks.Interop.swconst.swDocumentTypes_e.swDocDRAWING);
 
             if (drawingDoc != null)
             {
@@ -80,7 +77,6 @@ namespace SolidWorksToPdf
                                                              ref errors,
                                                              ref warnings);
 
-                // Properly close the document using CloseDoc
                 swApp.CloseDoc(drawingDoc.GetTitle());
 
                 if (saveResult && errors == 0)
@@ -102,7 +98,7 @@ namespace SolidWorksToPdf
         {
             string pdfFilePath = Path.Combine(outputDirectory, Path.GetFileNameWithoutExtension(filePath) + ".pdf");
 
-            using (PdfDocument document = new PdfDocument())  // Direct reference to PdfSharp's PdfDocument
+            using (PdfDocument document = new PdfDocument())
             {
                 using (MagickImageCollection images = new MagickImageCollection(filePath))
                 {
@@ -135,24 +131,40 @@ namespace SolidWorksToPdf
             Console.WriteLine($"Successfully converted {filePath} to {pdfFilePath}");
         }
 
-        static void ConvertDwgToPdf(string filePath, string outputDirectory)
+        static void ConvertDwgToPdfLateBinding(string filePath, string outputDirectory)
         {
-            // Initialize AutoCAD
-            AcadApplication acadApp = null;
+            object acadApp = null;
             try
             {
-                acadApp = (AcadApplication)Activator.CreateInstance(Type.GetTypeFromProgID("AutoCAD.Application"), true);
-                acadApp.Visible = false;
+                // Create the AutoCAD application object using late binding
+                Type acadType = Type.GetTypeFromProgID("AutoCAD.Application");
+                if (acadType == null)
+                {
+                    Console.WriteLine("AutoCAD is not installed on this machine.");
+                    return;
+                }
+                acadApp = Activator.CreateInstance(acadType);
+                acadType.InvokeMember("Visible", BindingFlags.SetProperty, null, acadApp, new object[] { false });
+
+                // Get the Documents collection
+                object documents = acadType.InvokeMember("Documents", BindingFlags.GetProperty, null, acadApp, null);
 
                 // Open the DWG file
-                AcadDocument acadDoc = acadApp.Documents.Open(filePath, false);
+                Type docType = documents.GetType();
+                object acadDoc = docType.InvokeMember("Open", BindingFlags.InvokeMethod, null, documents, new object[] { filePath, false });
+
+                // Get the Plot property from the document
+                object plot = acadDoc.GetType().InvokeMember("Plot", BindingFlags.GetProperty, null, acadDoc, null);
 
                 // Set up the PDF export options
                 string pdfFilePath = Path.Combine(outputDirectory, Path.GetFileNameWithoutExtension(filePath) + ".pdf");
 
-                acadDoc.Plot.PlotToFile(pdfFilePath, "DWG To PDF.pc3");
+                // Use late binding to call PlotToFile
+                plot.GetType().InvokeMember("PlotToFile", BindingFlags.InvokeMethod, null, plot, new object[] { pdfFilePath, "DWG To PDF.pc3" });
 
-                acadDoc.Close(false);  // Close the document without saving changes
+                // Close the document without saving changes
+                acadDoc.GetType().InvokeMember("Close", BindingFlags.InvokeMethod, null, acadDoc, new object[] { false });
+
                 Console.WriteLine($"Successfully converted {filePath} to {pdfFilePath}");
             }
             catch (Exception ex)
@@ -164,7 +176,7 @@ namespace SolidWorksToPdf
                 // Quit AutoCAD
                 if (acadApp != null)
                 {
-                    acadApp.Quit();
+                    acadApp.GetType().InvokeMember("Quit", BindingFlags.InvokeMethod, null, acadApp, null);
                 }
             }
         }
