@@ -17,11 +17,19 @@ namespace SolidWorksToPdf
         [STAThread]
         static void Main(string[] args)
         {
-            // Use a FolderBrowserDialog to allow the user to select a directory
-            string directoryPath = SelectDirectory();
-            if (string.IsNullOrEmpty(directoryPath))
+            // Use a FolderBrowserDialog to allow the user to select a directory for input files
+            string inputDirectoryPath = SelectDirectory("Select the directory containing .slddrw, .tif, and .dwg files");
+            if (string.IsNullOrEmpty(inputDirectoryPath))
             {
-                Console.WriteLine("No directory selected. Exiting the program.");
+                Console.WriteLine("No input directory selected. Exiting the program.");
+                return;
+            }
+
+            // Use a FolderBrowserDialog to allow the user to select a directory for saving PDFs
+            string outputDirectoryPath = SelectDirectory("Select the directory where PDFs will be saved");
+            if (string.IsNullOrEmpty(outputDirectoryPath))
+            {
+                Console.WriteLine("No output directory selected. Exiting the program.");
                 return;
             }
 
@@ -30,21 +38,21 @@ namespace SolidWorksToPdf
             swApp.FrameState = (int)SolidWorks.Interop.swconst.swWindowState_e.swWindowMinimized;  // Minimize the SolidWorks window
 
             // Convert all .slddrw files in the directory to PDFs
-            foreach (string filePath in Directory.GetFiles(directoryPath, "*.slddrw"))
+            foreach (string filePath in Directory.GetFiles(inputDirectoryPath, "*.slddrw"))
             {
-                ConvertSlddrwToPdf(swApp, filePath);
+                ConvertSlddrwToPdf(swApp, filePath, outputDirectoryPath);
             }
 
             // Convert all .tif files in the directory to PDFs
-            foreach (string filePath in Directory.GetFiles(directoryPath, "*.tif"))
+            foreach (string filePath in Directory.GetFiles(inputDirectoryPath, "*.tif"))
             {
-                ConvertTifToPdf(filePath);
+                ConvertTifToPdf(filePath, outputDirectoryPath);
             }
 
             // Convert all .dwg files in the directory to PDFs
-            foreach (string filePath in Directory.GetFiles(directoryPath, "*.dwg"))
+            foreach (string filePath in Directory.GetFiles(inputDirectoryPath, "*.dwg"))
             {
-                ConvertDwgToPdf(swApp, filePath);
+                ConvertDwgToPdf(swApp, filePath, outputDirectoryPath);
             }
 
             swApp.ExitApp();
@@ -53,13 +61,13 @@ namespace SolidWorksToPdf
             GC.Collect();
         }
 
-        static void ConvertSlddrwToPdf(SldWorks swApp, string filePath)
+        static void ConvertSlddrwToPdf(SldWorks swApp, string filePath, string outputDirectory)
         {
             ModelDoc2 drawingDoc = (ModelDoc2)swApp.OpenDoc(filePath, (int)swDocumentTypes_e.swDocDRAWING);
 
             if (drawingDoc != null)
             {
-                string pdfFilePath = Path.ChangeExtension(filePath, ".pdf");
+                string pdfFilePath = Path.Combine(outputDirectory, Path.GetFileNameWithoutExtension(filePath) + ".pdf");
                 int errors = 0;
                 int warnings = 0;
 
@@ -75,7 +83,7 @@ namespace SolidWorksToPdf
 
                 if (saveResult && errors == 0)
                 {
-                    Console.WriteLine($"Successfully converted {filePath} to PDF.");
+                    Console.WriteLine($"Successfully converted {filePath} to {pdfFilePath}");
                 }
                 else
                 {
@@ -88,9 +96,9 @@ namespace SolidWorksToPdf
             }
         }
 
-        static void ConvertTifToPdf(string filePath)
+        static void ConvertTifToPdf(string filePath, string outputDirectory)
         {
-            string pdfFilePath = Path.ChangeExtension(filePath, ".pdf");
+            string pdfFilePath = Path.Combine(outputDirectory, Path.GetFileNameWithoutExtension(filePath) + ".pdf");
 
             using (PdfDocument document = new PdfDocument())  // Direct reference to PdfSharp's PdfDocument
             {
@@ -122,16 +130,16 @@ namespace SolidWorksToPdf
                 document.Save(pdfFilePath);
             }
 
-            Console.WriteLine($"Successfully converted {filePath} to PDF.");
+            Console.WriteLine($"Successfully converted {filePath} to {pdfFilePath}");
         }
 
-        static void ConvertDwgToPdf(SldWorks swApp, string filePath)
+        static void ConvertDwgToPdf(SldWorks swApp, string filePath, string outputDirectory)
         {
             ModelDoc2 dwgDoc = (ModelDoc2)swApp.OpenDoc(filePath, (int)swDocumentTypes_e.swDocDRAWING);
 
             if (dwgDoc != null)
             {
-                string pdfFilePath = Path.ChangeExtension(filePath, ".pdf");
+                string pdfFilePath = Path.Combine(outputDirectory, Path.GetFileNameWithoutExtension(filePath) + ".pdf");
                 int errors = 0;
                 int warnings = 0;
 
@@ -147,7 +155,7 @@ namespace SolidWorksToPdf
 
                 if (saveResult && errors == 0)
                 {
-                    Console.WriteLine($"Successfully converted {filePath} to PDF.");
+                    Console.WriteLine($"Successfully converted {filePath} to {pdfFilePath}");
                 }
                 else
                 {
@@ -160,11 +168,11 @@ namespace SolidWorksToPdf
             }
         }
 
-        static string SelectDirectory()
+        static string SelectDirectory(string description)
         {
             using (FolderBrowserDialog folderBrowser = new FolderBrowserDialog())
             {
-                folderBrowser.Description = "Select the directory containing .slddrw, .tif, and .dwg files";
+                folderBrowser.Description = description;
                 folderBrowser.ShowNewFolderButton = false;
 
                 DialogResult result = folderBrowser.ShowDialog();
