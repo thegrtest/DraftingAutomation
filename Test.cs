@@ -7,6 +7,8 @@ using PdfSharp.Drawing;
 using SolidWorks.Interop.sldworks;
 using SolidWorks.Interop.swconst;
 using ImageMagick;
+using Autodesk.AutoCAD.Interop;   // Add AutoCAD Interop for DWG handling
+using Autodesk.AutoCAD.Interop.Common;
 using SwConst;
 using swDocumentTypes_e = SolidWorks.Interop.swconst.swDocumentTypes_e;
 
@@ -49,10 +51,10 @@ namespace SolidWorksToPdf
                 ConvertTifToPdf(filePath, outputDirectoryPath);
             }
 
-            // Convert all .dwg files in the directory to PDFs
+            // Convert all .dwg files in the directory to PDFs using AutoCAD COM
             foreach (string filePath in Directory.GetFiles(inputDirectoryPath, "*.dwg"))
             {
-                ConvertDwgToPdf(swApp, filePath, outputDirectoryPath);
+                ConvertDwgToPdf(filePath, outputDirectoryPath);
             }
 
             swApp.ExitApp();
@@ -133,38 +135,37 @@ namespace SolidWorksToPdf
             Console.WriteLine($"Successfully converted {filePath} to {pdfFilePath}");
         }
 
-        static void ConvertDwgToPdf(SldWorks swApp, string filePath, string outputDirectory)
+        static void ConvertDwgToPdf(string filePath, string outputDirectory)
         {
-            ModelDoc2 dwgDoc = (ModelDoc2)swApp.OpenDoc(filePath, (int)swDocumentTypes_e.swDocDRAWING);
-
-            if (dwgDoc != null)
+            // Initialize AutoCAD
+            AcadApplication acadApp = null;
+            try
             {
+                acadApp = (AcadApplication)Activator.CreateInstance(Type.GetTypeFromProgID("AutoCAD.Application"), true);
+                acadApp.Visible = false;
+
+                // Open the DWG file
+                AcadDocument acadDoc = acadApp.Documents.Open(filePath, false);
+
+                // Set up the PDF export options
                 string pdfFilePath = Path.Combine(outputDirectory, Path.GetFileNameWithoutExtension(filePath) + ".pdf");
-                int errors = 0;
-                int warnings = 0;
 
-                bool saveResult = dwgDoc.Extension.SaveAs(pdfFilePath,
-                                                          (int)SolidWorks.Interop.swconst.swSaveAsVersion_e.swSaveAsCurrentVersion,
-                                                          (int)SolidWorks.Interop.swconst.swSaveAsOptions_e.swSaveAsOptions_Silent,
-                                                          null,
-                                                          ref errors,
-                                                          ref warnings);
+                acadDoc.Plot.PlotToFile(pdfFilePath, "DWG To PDF.pc3");
 
-                // Properly close the document using CloseDoc
-                swApp.CloseDoc(dwgDoc.GetTitle());
-
-                if (saveResult && errors == 0)
-                {
-                    Console.WriteLine($"Successfully converted {filePath} to {pdfFilePath}");
-                }
-                else
-                {
-                    Console.WriteLine($"Failed to convert {filePath} to PDF. Errors: {errors}, Warnings: {warnings}");
-                }
+                acadDoc.Close(false);  // Close the document without saving changes
+                Console.WriteLine($"Successfully converted {filePath} to {pdfFilePath}");
             }
-            else
+            catch (Exception ex)
             {
-                Console.WriteLine($"Failed to open {filePath}. Ensure SolidWorks is installed and the file is accessible.");
+                Console.WriteLine($"Error converting {filePath} to PDF: {ex.Message}");
+            }
+            finally
+            {
+                // Quit AutoCAD
+                if (acadApp != null)
+                {
+                    acadApp.Quit();
+                }
             }
         }
 
